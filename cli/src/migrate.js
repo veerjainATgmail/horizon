@@ -12,6 +12,7 @@ const interrupt = require('./utils/interrupt');
 const change_to_project_dir = require('./utils/change_to_project_dir');
 const parse_yes_no_option = require('./utils/parse_yes_no_option');
 const start_rdb_server = require('./utils/start_rdb_server');
+const NiceError = require('./utils/nice_error.js');
 
 const VERSION_2_0 = [ 2, 0, 0 ];
 
@@ -128,10 +129,11 @@ function processConfig(cmdArgs) {
   }
 
   if (options.project_name == null) {
-    throw new Error(
-      'No project_name given: either pass the --project-name ' +
-        'option or add the "project_name" key to your ' +
-        '.hz/config.toml');
+    throw new NiceError('No project_name given', {
+      suggestions: [
+        'pass the --project-name option',
+        'add the "project_name" key to your .hz/config.toml',
+      ] });
   }
   return options;
 }
@@ -214,10 +216,11 @@ function validateMigration() {
       .run(this.conn)
       .then(() => green(' └── Pre-2.0 schema found'))
       .catch((e) => {
-        throw new Error(`\
-${e.msg}.
-This could happen if you don't have a Horizon app in this database \
-or if you've already migrated to the version 2.0 format.`);
+        throw new NiceError(e.msg, {
+          suggestions: [
+            "This could happen if you don't have a Horizon app in this database",
+            'You may have already migrated to the version 2.0 format',
+          ] });
       });
   });
 }
@@ -245,21 +248,19 @@ function makeBackup() {
     green(' └── Backup completed');
   }).catch((e) => {
     if (e.message.match(/Python driver/)) {
-      throw new Error(`\
-The RethinkDB Python driver is not installed, so we can't \
-do a backup before migrating.
-
-You can install the Python driver with the instructions \
-found at:
-http://www.rethinkdb.com/docs/install-drivers/python/
-
-Alternately, you may pass the --nonportable-backup flag \
+      throw new Error(
+        'The RethinkDB Python driver is not installed,' +
+          "so we can't do a backup before migrating.", {
+            suggestions: [
+              'Install the Python driver with the instructions found at: ' +
+                'http://www.rethinkdb.com/docs/install-drivers/python/',
+              `Pass the --nonportable-backup flag \
 to hz migrate. This flag uses the tar command to make a \
 backup, but the backup is not safe to use on another \
 machine or to create replicas from. This option should \
 not be used if RethinkDB is already running and if the \
-rethinkdb_data directory is in the current directory.
-`);
+rethinkdb_data directory is in the current directory.`,
+            ] });
     } else {
       throw e;
     }
